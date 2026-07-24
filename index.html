@@ -45,7 +45,7 @@
 <canvas id="minimap" width="160" height="160"></canvas>
 <div id="blocker">
   <h1>Your Dream House</h1>
-  <p>Click to walk in. Use WASD to move, and click + drag anywhere to look around. This is a rough first pass — basic shapes and colors just to get the layout and scale right.</p>
+  <p>Click to walk in. Use WASD to move, and click + drag anywhere to look around. Now with real textures, warm lighting, and colors pulled from your inspiration.</p>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -66,9 +66,9 @@ renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
 // Lighting
-const hemi = new THREE.HemisphereLight(0xbcd7ff, 0x2a2035, 0.9);
+const hemi = new THREE.HemisphereLight(0xa8c0e0, 0x3a2a45, 0.75);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff2d8, 0.9);
+const sun = new THREE.DirectionalLight(0xffe8c0, 0.85);
 sun.position.set(20, 30, 10);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -76,40 +76,124 @@ sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
 sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40;
 scene.add(sun);
 
-// ---------- Materials (rough color-block first pass) ----------
+// ---------- Procedural textures (canvas-based, so no external image assets needed) ----------
+function makeCanvas(w,h){ const c = document.createElement('canvas'); c.width=w; c.height=h; return c; }
+
+function woodTexture(base, streak, plankCount=8){
+  const c = makeCanvas(256,256); const ctx = c.getContext('2d');
+  ctx.fillStyle = base; ctx.fillRect(0,0,256,256);
+  for (let i=0;i<plankCount;i++){
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fillRect(0, i*(256/plankCount), 256, 2);
+  }
+  for (let i=0;i<140;i++){
+    ctx.strokeStyle = streak;
+    ctx.globalAlpha = 0.08 + Math.random()*0.1;
+    ctx.beginPath();
+    const y = Math.random()*256;
+    ctx.moveTo(0, y);
+    ctx.bezierCurveTo(80,y+Math.random()*10-5, 170,y+Math.random()*10-5, 256, y+Math.random()*6-3);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function tileTexture(base, grout, count=6){
+  const c = makeCanvas(256,256); const ctx = c.getContext('2d');
+  ctx.fillStyle = grout; ctx.fillRect(0,0,256,256);
+  const cell = 256/count;
+  for (let y=0;y<count;y++) for (let x=0;x<count;x++){
+    ctx.fillStyle = base;
+    ctx.fillRect(x*cell+3, y*cell+3, cell-6, cell-6);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function carpetTexture(base){
+  const c = makeCanvas(128,128); const ctx = c.getContext('2d');
+  ctx.fillStyle = base; ctx.fillRect(0,0,128,128);
+  for (let i=0;i<900;i++){
+    ctx.fillStyle = `rgba(0,0,0,${Math.random()*0.05})`;
+    ctx.fillRect(Math.random()*128, Math.random()*128, 2, 2);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function plasterTexture(base){
+  const c = makeCanvas(128,128); const ctx = c.getContext('2d');
+  ctx.fillStyle = base; ctx.fillRect(0,0,128,128);
+  for (let i=0;i<400;i++){
+    ctx.fillStyle = `rgba(255,255,255,${Math.random()*0.04})`;
+    ctx.fillRect(Math.random()*128, Math.random()*128, 3, 3);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function repeatTex(tex, rx, ry){ tex.repeat.set(rx,ry); return tex; }
+
+// ---------- Materials (textured, styled to your inspiration) ----------
 const mat = (color, opts={}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0.05, ...opts });
+const matTex = (tex, opts={}) => new THREE.MeshStandardMaterial({ map: tex, roughness: 0.92, metalness: 0.03, ...opts });
 
 const M = {
-  ground: mat(0x3a4a2e),
-  driveway: mat(0x555555),
-  porch: mat(0x6b4a30),
-  wallOuter: mat(0xcfae87),
-  wallInner: mat(0xece3d6),
-  roof: mat(0x2b2b2b),
-  floorWood: mat(0x7a5230),
-  floorTile: mat(0xb5754a),
-  floorCarpetGray: mat(0xa89f8f),
-  kitchen: mat(0x8fae7a),
-  living: mat(0x7b4b3a),
-  dining: mat(0x9c7a4e),
-  homeschool: mat(0xffffff),
-  homeschoolAccent: mat(0xd946a3),
-  boysRoom: mat(0x4a5a6b),
-  girlsRoom: mat(0xf2c6d8),
-  office: mat(0x1c1c22),
-  officeAccent: mat(0x7f4fd8),
-  master: mat(0xd9d2c4),
-  closet: mat(0x5a3d28),
-  bathroom: mat(0xdfe6e8),
-  shedOutside: mat(0x3a7a6b),
-  garden: mat(0x4a6b2e),
-  greenhouse: mat(0x88c0a0, { transparent: true, opacity: 0.35 }),
-  fence: mat(0x6b5030),
-  glass: new THREE.MeshStandardMaterial({ color: 0xbcd7ff, transparent: true, opacity: 0.25, roughness: 0.1 }),
-  door: mat(0x3a2418),
-  furniture: mat(0x4a3826),
-  accentBlack: mat(0x111111),
+  ground: mat(0x3a5a2e),
+  driveway: mat(0x4a4a4a),
+  porch: matTex(repeatTex(woodTexture('#6b4a30','#3a2a18'), 4, 3)),
+  wallOuter: matTex(repeatTex(woodTexture('#b98a55','#8a6238'), 3, 2)),
+  wallInner: matTex(repeatTex(plasterTexture('#efe6d8'), 3, 2)),
+  roof: mat(0x1e1e22),
+  floorWood: matTex(repeatTex(woodTexture('#7a5230','#4a2e15'), 4, 4)),
+  floorWoodDark: matTex(repeatTex(woodTexture('#4a2e18','#2a180c'), 4, 4)),
+  floorTile: matTex(repeatTex(tileTexture('#c07a4a','#7a4326'), 5, 4)),
+  floorCarpetGray: matTex(repeatTex(carpetTexture('#a89f8f'), 6, 6)),
+  floorCarpetPurple: matTex(repeatTex(carpetTexture('#4a3a6b'), 6, 6)),
+  floorCarpetPink: matTex(repeatTex(carpetTexture('#f2c6d8'), 6, 6)),
+  floorCarpetBlue: matTex(repeatTex(carpetTexture('#3a4a6b'), 6, 6)),
+  kitchenCabinet: matTex(repeatTex(woodTexture('#5a7050','#2e3e28'), 2, 2)),
+  kitchenCounter: mat(0xe8dcc8, {roughness: 0.3}),
+  livingVelvet: mat(0xb5502e, {roughness: 0.65}),
+  diningWood: matTex(repeatTex(woodTexture('#7a5230','#4a2e15'), 2, 2)),
+  homeschoolWall: matTex(repeatTex(plasterTexture('#ffffff'), 2, 2)),
+  homeschoolRainbow1: mat(0xd946a3),
+  homeschoolRainbow2: mat(0xf2a03d),
+  homeschoolRainbow3: mat(0x3dc7f2),
+  homeschoolRainbow4: mat(0x6ad14a),
+  boysRoomWall: mat(0x33445a),
+  boysRoomWood: matTex(repeatTex(woodTexture('#6b4a2e','#3a2a18'), 2, 2)),
+  girlsRoomWall: mat(0xf7d7e6),
+  girlsRoomAccent: mat(0xd9a0c4),
+  officeWall: mat(0x141418),
+  officeAccentPurple: mat(0x7f4fd8),
+  officeAccentBlack: mat(0x0a0a0a),
+  masterWall: mat(0xe3dccb),
+  masterCarpet: matTex(repeatTex(carpetTexture('#cfc6b4'), 6, 6)),
+  closetWood: matTex(repeatTex(woodTexture('#5a3d28','#2e1f14'), 2, 2)),
+  bathroomTile: matTex(repeatTex(tileTexture('#dfe6e8','#b8c2c4'), 6, 6)),
+  shedOutside: mat(0x2e6b58),
+  shedAccentPurple: mat(0x8a5fd8),
+  shedAccentPink: mat(0xd85fa0),
+  garden: mat(0x3a5a24),
+  gardenBed: matTex(repeatTex(woodTexture('#5a3d28','#2e1f14'), 2, 1)),
+  greenhouse: mat(0x9fd4b4, { transparent: true, opacity: 0.4 }),
+  greenhouseFrame: mat(0x6b4a30),
+  fence: matTex(repeatTex(woodTexture('#6b5030','#3a2a18'), 8, 1)),
+  glass: new THREE.MeshStandardMaterial({ color: 0xbcd7ff, transparent: true, opacity: 0.22, roughness: 0.05 }),
+  door: mat(0x2a1a10),
+  furniture: matTex(repeatTex(woodTexture('#4a3826','#2a1e14'), 2, 2)),
+  accentBlack: mat(0x0d0d0d),
   accentPurple: mat(0x6a4fc9),
+  plant: mat(0x3a6b2e),
+  fabricRed: mat(0x7a1e1e, {roughness: 0.6}),
+  metalChrome: mat(0xc8c8c8, {roughness: 0.25, metalness: 0.8}),
 };
 
 const rooms = []; // {name, minX,maxX,minZ,maxZ, labelY}
@@ -173,6 +257,15 @@ const T = 0.2; // wall thickness
    Outside: porch front (Z > 0), backyard rear (Z < -16), she-shed + greenhouse side
 ================================= */
 
+function lamp(x,y,z,color=0xffcf8a,intensity=0.7,distance=6){
+  const l = new THREE.PointLight(color, intensity, distance, 2);
+  l.position.set(x,y,z);
+  scene.add(l);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12,8,8), new THREE.MeshBasicMaterial({color}));
+  bulb.position.set(x,y,z);
+  group.add(bulb);
+}
+
 // ---- Ground ----
 floorPanel(0, -5, 120, 120, M.ground, -0.1);
 floorPanel(0, 16, 6, 14, M.driveway, -0.05); // driveway leading to porch
@@ -180,120 +273,128 @@ floorPanel(0, 16, 6, 14, M.driveway, -0.05); // driveway leading to porch
 // ================= FRONT PORCH =================
 floorPanel(0, 8, 14, 6, M.porch, 0.05);
 roomLabel("Front Porch", -7, 7, 5, 11);
-// porch roof posts
 [-6,-2,2,6].forEach(x => simpleProp(0.3,2.6,0.3, M.furniture, x, 0, 10.8));
 box(14.4, 0.3, 6.4, M.roof, 0, 2.7, 8);
-// rocking chairs (simple props)
-simpleProp(0.6,0.9,0.6, M.living, -3, 0.1, 9.5);
-simpleProp(0.6,0.9,0.6, M.living, -1.8, 0.1, 9.5);
+simpleProp(0.6,0.9,0.6, M.furniture, -3, 0.1, 9.5); // rocking chair
+simpleProp(0.6,0.9,0.6, M.furniture, -1.8, 0.1, 9.5); // rocking chair
+lamp(0, 2.4, 8, 0xffcf8a, 0.6, 10);
 
 // ================= LIVING ROOM =================
 floorPanel(0, -3.5, 12, 7, M.floorWood, 0.05);
 roomLabel("Living Room", -6, 6, -7, 0);
-simpleProp(4,0.8,2, M.living, 0, 0.1, -3, 0); // sunken sectional block
+simpleProp(4,0.8,2, M.livingVelvet, 0, 0.1, -3, 0); // sunken sectional block
 simpleProp(1.2,0.5,1.2, M.furniture, 0, 0.1, -1.5); // coffee table
-box(3, 1.6, 0.3, M.accentBlack, -5.85, 0.8, -3); // fireplace hint on west wall
+box(3, 1.8, 0.3, M.accentBlack, -5.85, 0.9, -3); // fireplace surround
+box(2.2, 1.2, 0.15, mat(0x1a1a1a), -5.8, 0.6, -3); // firebox
+simpleProp(2.5, 1.8, 0.3, M.furniture, -5.85, 1.9, -4.5); // built-in bookshelf
+lamp(-4, 2, -2, 0xffb066, 0.6, 6);
 
-// front doorway (porch -> living)
 doorway(0, 4.5, 12, WALL_H, T, M.wallOuter, false, 2.2);
 
 // ================= KITCHEN / DINING (rear-center) =================
 floorPanel(0, -12, 12, 8, M.floorTile, 0.05);
 roomLabel("Kitchen & Dining", -6, 6, -16, -7);
-simpleProp(3.6,1.0,1.6, M.kitchen, 1.5, 0.1, -13); // island
-simpleProp(2.6,0.9,1.2, M.dining, -2.5, 0.1, -14); // dining table
-simpleProp(1.5,1.8,0.8, M.furniture, 5.6, 0.1, -14); // double oven / pantry block
+simpleProp(3.6,1.0,1.6, M.kitchenCabinet, 1.5, 0.1, -13); // island
+box(3.6, 0.1, 1.8, M.kitchenCounter, 1.5, 1.05, -13); // counter top
+simpleProp(2.6,0.9,1.2, M.diningWood, -2.5, 0.1, -14); // dining table
+simpleProp(1.5,1.8,0.8, M.kitchenCabinet, 5.6, 0.1, -14); // double oven / pantry block
+box(1.1,1.1,0.1, M.metalChrome, 5.6, 1.0, -13.55); // oven door hint
+lamp(1.5, 2.3, -13, 0xfff2d0, 0.7, 7);
 
-// wall separating living / kitchen with open doorway
 doorway(0, -7, 12, WALL_H, T, M.wallInner, false, 3);
-
-// rear exterior wall of kitchen with doorway to backyard
 doorway(0, -16, 12, WALL_H, T, M.wallOuter, false, 2.2);
-
-// outer side walls of central hub
 wallSegment(-6, -8, 16, WALL_H, T, M.wallOuter, true);
 wallSegment(6, -8, 16, WALL_H, T, M.wallOuter, true);
 
 // ================= FAMILY WING (west, homeschool + kids) =================
-// Homeschool / rec room
-floorPanel(-13, -3, 10, 8, M.homeschool, 0.05);
+floorPanel(-13, -3, 10, 8, M.floorCarpetGray, 0.05);
 roomLabel("Homeschool & Rec Room", -18, -8, -7, 1);
-simpleProp(3.5,0.9,1.4, M.homeschoolAccent, -13, 0.1, -3); // craft table
-box(0.3, 2.2, 5, M.homeschoolAccent, -17.8, 1.1, -3); // rainbow shelf wall accent
+simpleProp(3.5,0.9,1.4, M.diningWood, -13, 0.1, -3); // craft table
+// rainbow shelf wall
+[M.homeschoolRainbow1, M.homeschoolRainbow2, M.homeschoolRainbow3, M.homeschoolRainbow4].forEach((m,i)=>{
+  box(0.25, 1, 1, m, -17.7, 0.6+i*1.05, -5+i*1.2);
+});
+box(2.5, 1.4, 0.5, M.furniture, -13, 0.7, -6.5); // reading nook bean bag block
+lamp(-13, 2.3, -3, 0xfff2d0, 0.6, 7);
 
 // Boys room
-floorPanel(-13, -12, 8, 7, M.boysRoom, 0.05);
+floorPanel(-13, -12, 8, 7, M.floorCarpetBlue, 0.05);
 roomLabel("Jakob's Room", -17, -9, -16, -9);
-simpleProp(2.4,1.2,1.6, M.furniture, -15.5, 0.1, -14); // loft bed block
+simpleProp(2.4,1.2,1.6, M.boysRoomWood, -15.5, 0.1, -14); // loft bed block
 box(1.2, 2.2, 1.2, M.accentBlack, -10.5, 1.1, -12.5); // climbing wall hint
+lamp(-13, 2.3, -12, 0xa8c8ff, 0.5, 6);
 
 // Girls room
-floorPanel(-4.5, -12, 7, 7, M.girlsRoom, 0.05);
+floorPanel(-4.5, -12, 7, 7, M.floorCarpetPink, 0.05);
 roomLabel("Elli's Room", -8, -1, -16, -9);
-simpleProp(2,1.6,1.4, M.furniture, -6.5, 0.1, -14); // castle bed block
+simpleProp(2,1.6,1.4, M.girlsRoomAccent, -6.5, 0.1, -14); // castle bed block
+lamp(-4.5, 2.3, -12, 0xffcfe6, 0.5, 6);
 
-// west wing connecting walls + doorways
-doorway(-8, -3, 8, WALL_H, T, M.wallInner, true, 2); // hub <-> homeschool
-doorway(-13, -7, 8, WALL_H, T, M.wallInner, false, 1.8); // homeschool <-> boys
-doorway(-8, -12, 8, WALL_H, T, M.wallInner, true, 1.8); // boys <-> girls
-wallSegment(-18, -7.5, 17, WALL_H, T, M.wallOuter, true); // west outer wall
-wallSegment(-8.5, -16, 20, WALL_H, T, M.wallOuter, false); // far wall
+doorway(-8, -3, 8, WALL_H, T, M.wallInner, true, 2);
+doorway(-13, -7, 8, WALL_H, T, M.wallInner, false, 1.8);
+doorway(-8, -12, 8, WALL_H, T, M.wallInner, true, 1.8);
+wallSegment(-18, -7.5, 17, WALL_H, T, M.wallOuter, true);
+wallSegment(-8.5, -16, 20, WALL_H, T, M.wallOuter, false);
 
 // ================= QUIET WING (east, office + master) =================
-// Office / Game Room
-floorPanel(13, -3, 10, 8, M.office, 0.05);
+floorPanel(13, -3, 10, 8, M.floorCarpetPurple, 0.05);
 roomLabel("Office & Game Room", 8, 18, -7, 1);
-box(1.6, 1.2, 0.4, M.accentPurple, 17.7, 0.6, -1); // arcade cabinet hint
+box(1.6, 1.2, 0.4, M.officeAccentPurple, 17.7, 0.6, -1); // arcade cabinet hint
 simpleProp(2.4,0.8,1, M.furniture, 11, 0.1, -1.5); // shared desk
-simpleProp(0.6,1.8,0.3, M.accentBlack, 9, 0.9, -5.5); // NECA shelf hint
+simpleProp(0.6,1.8,0.3, M.officeAccentBlack, 9, 0.9, -5.5); // NECA shelf hint
+box(0.55,0.55,0.55, M.accentPurple, 9, 1.5, -5.5); // figure on shelf hint
+lamp(13, 2.3, -3, 0xb99aff, 0.55, 7);
 
-// Master Suite (bedroom + closet + bath combined block for now)
-floorPanel(13, -12, 10, 7, M.master, 0.05);
+// Master Suite
+floorPanel(13, -12, 10, 7, M.masterCarpet, 0.05);
 roomLabel("Master Bedroom", 8, 18, -16, -9);
-simpleProp(3,0.9,2.2, M.furniture, 11.5, 0.1, -12.5); // bed
-box(2.2, 2.4, 0.3, M.bathroom, 17.8, 1.2, -14.5); // ensuite hint wall
-box(2.2, 2.4, 0.3, M.closet, 17.8, 1.2, -10); // closet hint wall
+simpleProp(3,0.9,2.2, M.furniture, 11.5, 0.1, -12.5); // bed frame
+box(2.8, 0.35, 2, mat(0x2a2a30), 11.5, 0.95, -12.5); // dark bedding accent
+box(2.2, 2.4, 0.3, M.bathroomTile, 17.8, 1.2, -14.5); // ensuite hint wall
+box(2.2, 2.4, 0.3, M.closetWood, 17.8, 1.2, -10); // closet hint wall
+lamp(11.5, 2.3, -12.5, 0xffcf8a, 0.5, 6);
 
-doorway(8, -3, 8, WALL_H, T, M.wallInner, true, 2); // hub <-> office
-doorway(13, -7, 8, WALL_H, T, M.wallInner, false, 1.8); // office <-> master
-wallSegment(18, -7.5, 17, WALL_H, T, M.wallOuter, true); // east outer wall
+doorway(8, -3, 8, WALL_H, T, M.wallInner, true, 2);
+doorway(13, -7, 8, WALL_H, T, M.wallInner, false, 1.8);
+wallSegment(18, -7.5, 17, WALL_H, T, M.wallOuter, true);
 wallSegment(13.5, -16, 20, WALL_H, T, M.wallOuter, false);
 
-// front wall segments either side of porch entry
 wallSegment(-9, 0, 6, WALL_H, T, M.wallOuter, false);
 wallSegment(9, 0, 6, WALL_H, T, M.wallOuter, false);
 
-// ================= ROOFING (simple flat caps for scale) =================
+// ================= ROOFING =================
 box(38, 0.3, 24, M.roof, 0, WALL_H + 0.15, -8);
 
 // ================= BACKYARD =================
 roomLabel("Backyard", -20, 20, -36, -17);
 floorPanel(0, -26, 40, 20, M.garden, -0.05);
-// raised garden beds
-[-14,-10].forEach((x,i)=> simpleProp(3,0.5,1.2, M.furniture, x, 0.1, -20));
-// fire pit
-simpleProp(1.4,0.4,1.4, M.accentBlack, 4, 0.1, -22);
-// chicken coop
-simpleProp(2,1.4,1.6, M.furniture, 12, 0.1, -20);
-// shaded play area
-simpleProp(2.4,2,2.4, M.homeschoolAccent, -4, 0.1, -28);
+[-14,-10].forEach((x)=>{
+  simpleProp(3,0.5,1.2, M.gardenBed, x, 0.1, -20);
+  simpleProp(2.6,0.3,0.9, mat(0x3a5a24), x, 0.55, -20); // soil/plants hint
+});
+simpleProp(1.4,0.4,1.4, M.accentBlack, 4, 0.1, -22); // fire pit ring
+box(1.1,0.15,1.1, mat(0xff6a2e, {emissive:0xff3300, emissiveIntensity:0.4}), 4, 0.35, -22); // fire glow
+lamp(4, 0.6, -22, 0xff8040, 0.8, 5);
+simpleProp(2,1.4,1.6, M.furniture, 12, 0.1, -20); // chicken coop
+simpleProp(2.4,2,2.4, M.homeschoolRainbow2, -4, 0.1, -28); // shaded play area
 
 // greenhouse
 box(6, 3, 5, M.greenhouse, 14, 1.5, -30);
+box(6.2, 0.1, 5.2, M.greenhouseFrame, 14, 0.05, -30);
 roomLabel("Greenhouse", 10, 18, -33, -27);
 
 // she-shed
 box(5, 3, 4, M.shedOutside, -16, 1.5, -30);
+box(1.2, 2, 0.2, M.shedAccentPurple, -16, 1, -28); // door accent
+box(1, 1, 0.15, M.shedAccentPink, -14.2, 2, -30); // moon/window accent
+lamp(-16, 2, -28.5, 0xd9a0ff, 0.6, 5);
 roomLabel("She Shed", -19, -13, -33, -27);
-box(1.2, 2, 0.2, M.accentPurple, -16, 1, -28); // door accent
 
-// backyard fence
 function fenceLine(x1,z1,x2,z2){
   const len = Math.hypot(x2-x1, z2-z1);
   const midX = (x1+x2)/2, midZ = (z1+z2)/2;
   const angle = Math.atan2(x2-x1, z2-z1);
-  const m = box(len, 1.6, 0.15, M.fence, midX, midZ+0, 0);
-  m.position.set(midX, 0.8, midZ);
+  const m = box(len, 1.6, 0.15, M.fence, midX, 0.8, midZ);
   m.rotation.y = angle;
 }
 fenceLine(-20,-17,20,-17);
@@ -303,7 +404,7 @@ fenceLine(-20,-36,20,-36);
 
 // ================= TREES / EXTERIOR DRESSING =================
 function tree(x,z){
-  const trunk = box(0.4,2,0.4, M.furniture, x, 1, z);
+  box(0.4,2,0.4, M.furniture, x, 1, z);
   const top = new THREE.Mesh(new THREE.SphereGeometry(1.3,8,8), mat(0x2e5a34));
   top.position.set(x, 2.6, z);
   top.castShadow = true;
