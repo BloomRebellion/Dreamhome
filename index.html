@@ -60,23 +60,51 @@ const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000
 const EYE_HEIGHT = 1.7;
 camera.position.set(0, EYE_HEIGHT, 14);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+renderer.physicallyCorrectLights = true;
 document.body.appendChild(renderer.domElement);
 
 // Lighting
-const hemi = new THREE.HemisphereLight(0xa8c0e0, 0x3a2a45, 0.75);
+const hemi = new THREE.HemisphereLight(0xbcd0ec, 0x2e2238, 0.55);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xffe8c0, 0.85);
+const sun = new THREE.DirectionalLight(0xfff0d0, 1.6);
 sun.position.set(20, 30, 10);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0006;
+sun.shadow.normalBias = 0.02;
 sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
 sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40;
 scene.add(sun);
+const fill = new THREE.DirectionalLight(0x8fa8d8, 0.35);
+fill.position.set(-15, 12, -20);
+scene.add(fill);
 
-// ---------- Procedural textures (canvas-based, so no external image assets needed) ----------
+// ---------- Real photo textures (Three.js official CC0 example assets) ----------
+const texLoader = new THREE.TextureLoader();
+const TEX_BASE = 'https://threejs.org/examples/textures/';
+function loadTex(path, rx=1, ry=1){
+  const t = texLoader.load(TEX_BASE + path);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+function loadTexPair(diffusePath, rx=1, ry=1){
+  return matTexReal(loadTex(diffusePath, rx, ry));
+}
+function matTexReal(map, opts={}){
+  return new THREE.MeshStandardMaterial({ map, roughness: 0.85, metalness: 0.02, ...opts });
+}
+
+// ---------- Procedural textures (canvas-based fallback for surfaces without a real photo) ----------
 function makeCanvas(w,h){ const c = document.createElement('canvas'); c.width=w; c.height=h; return c; }
 
 function woodTexture(base, streak, plankCount=8){
@@ -147,28 +175,28 @@ const matTex = (tex, opts={}) => new THREE.MeshStandardMaterial({ map: tex, roug
 const M = {
   ground: mat(0x3a5a2e),
   driveway: mat(0x4a4a4a),
-  porch: matTex(repeatTex(woodTexture('#6b4a30','#3a2a18'), 4, 3)),
-  wallOuter: matTex(repeatTex(woodTexture('#b98a55','#8a6238'), 3, 2)),
+  porch: matTexReal(loadTex('hardwood2_diffuse.jpg', 5, 3.5)),
+  wallOuter: matTexReal(loadTex('brick_diffuse.jpg', 4, 2.2), {color: 0xd8b98a}),
   wallInner: matTex(repeatTex(plasterTexture('#efe6d8'), 3, 2)),
   roof: mat(0x1e1e22),
-  floorWood: matTex(repeatTex(woodTexture('#7a5230','#4a2e15'), 4, 4)),
-  floorWoodDark: matTex(repeatTex(woodTexture('#4a2e18','#2a180c'), 4, 4)),
+  floorWood: matTexReal(loadTex('hardwood2_diffuse.jpg', 4.5, 4.5)),
+  floorWoodDark: matTexReal(loadTex('hardwood2_diffuse.jpg', 4.5, 4.5), {color: 0x8a7860}),
   floorTile: matTex(repeatTex(tileTexture('#c07a4a','#7a4326'), 5, 4)),
   floorCarpetGray: matTex(repeatTex(carpetTexture('#a89f8f'), 6, 6)),
   floorCarpetPurple: matTex(repeatTex(carpetTexture('#4a3a6b'), 6, 6)),
   floorCarpetPink: matTex(repeatTex(carpetTexture('#f2c6d8'), 6, 6)),
   floorCarpetBlue: matTex(repeatTex(carpetTexture('#3a4a6b'), 6, 6)),
-  kitchenCabinet: matTex(repeatTex(woodTexture('#5a7050','#2e3e28'), 2, 2)),
+  kitchenCabinet: matTexReal(loadTex('hardwood2_diffuse.jpg', 1.5, 1.5), {color: 0x8fae7a}),
   kitchenCounter: mat(0xe8dcc8, {roughness: 0.3}),
   livingVelvet: mat(0xb5502e, {roughness: 0.65}),
-  diningWood: matTex(repeatTex(woodTexture('#7a5230','#4a2e15'), 2, 2)),
+  diningWood: matTexReal(loadTex('hardwood2_diffuse.jpg', 1.5, 1.5)),
   homeschoolWall: matTex(repeatTex(plasterTexture('#ffffff'), 2, 2)),
   homeschoolRainbow1: mat(0xd946a3),
   homeschoolRainbow2: mat(0xf2a03d),
   homeschoolRainbow3: mat(0x3dc7f2),
   homeschoolRainbow4: mat(0x6ad14a),
   boysRoomWall: mat(0x33445a),
-  boysRoomWood: matTex(repeatTex(woodTexture('#6b4a2e','#3a2a18'), 2, 2)),
+  boysRoomWood: matTexReal(loadTex('hardwood2_diffuse.jpg', 1.5, 1.5), {color: 0x9ab0c8}),
   girlsRoomWall: mat(0xf7d7e6),
   girlsRoomAccent: mat(0xd9a0c4),
   officeWall: mat(0x141418),
@@ -176,19 +204,19 @@ const M = {
   officeAccentBlack: mat(0x0a0a0a),
   masterWall: mat(0xe3dccb),
   masterCarpet: matTex(repeatTex(carpetTexture('#cfc6b4'), 6, 6)),
-  closetWood: matTex(repeatTex(woodTexture('#5a3d28','#2e1f14'), 2, 2)),
+  closetWood: matTexReal(loadTex('hardwood2_diffuse.jpg', 1.5, 1.5), {color: 0xa88860}),
   bathroomTile: matTex(repeatTex(tileTexture('#dfe6e8','#b8c2c4'), 6, 6)),
   shedOutside: mat(0x2e6b58),
   shedAccentPurple: mat(0x8a5fd8),
   shedAccentPink: mat(0xd85fa0),
   garden: mat(0x3a5a24),
-  gardenBed: matTex(repeatTex(woodTexture('#5a3d28','#2e1f14'), 2, 1)),
+  gardenBed: matTexReal(loadTex('hardwood2_diffuse.jpg', 1.5, 1), {color: 0xa88860}),
   greenhouse: mat(0x9fd4b4, { transparent: true, opacity: 0.4 }),
   greenhouseFrame: mat(0x6b4a30),
-  fence: matTex(repeatTex(woodTexture('#6b5030','#3a2a18'), 8, 1)),
-  glass: new THREE.MeshStandardMaterial({ color: 0xbcd7ff, transparent: true, opacity: 0.22, roughness: 0.05 }),
+  fence: matTexReal(loadTex('hardwood2_diffuse.jpg', 8, 1), {color: 0xb8966a}),
+  glass: new THREE.MeshPhysicalMaterial({ color: 0xdceeff, transparent: true, opacity: 0.18, roughness: 0.02, metalness: 0, transmission: 0.65, clearcoat: 1 }),
   door: mat(0x2a1a10),
-  furniture: matTex(repeatTex(woodTexture('#4a3826','#2a1e14'), 2, 2)),
+  furniture: matTexReal(loadTex('hardwood2_diffuse.jpg', 2, 2), {color: 0xb8966a}),
   accentBlack: mat(0x0d0d0d),
   accentPurple: mat(0x6a4fc9),
   plant: mat(0x3a6b2e),
@@ -247,6 +275,65 @@ function simpleProp(w,h,d,material,x,y,z,ry=0){
   box(w,h,d,material,x,y+h/2,z,ry);
 }
 
+// ---------- Composed furniture (multi-part, not single blocks) ----------
+function tableWithLegs(w,h,d,topThick,legMat,topMat,x,y,z,ry=0){
+  const legR = 0.06;
+  const legH = h - topThick;
+  const offX = w/2 - 0.15, offZ = d/2 - 0.15;
+  [[offX,offZ],[-offX,offZ],[offX,-offZ],[-offX,-offZ]].forEach(([lx,lz])=>{
+    const cx = x + lx*Math.cos(ry) - lz*Math.sin(ry);
+    const cz = z + lx*Math.sin(ry) + lz*Math.cos(ry);
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(legR,legR,legH,8), legMat);
+    leg.position.set(cx, y+legH/2, cz);
+    leg.castShadow = true; group.add(leg);
+  });
+  box(w,topThick,d, topMat, x, y+legH+topThick/2, z, ry);
+}
+
+function sofaBlock(w,h,d,seatMat,x,y,z,ry=0){
+  box(w, h*0.45, d, seatMat, x, y+h*0.225, z, ry);
+  const backOffZ = -d/2 + 0.15;
+  box(w, h, d*0.28, seatMat, x + backOffZ*Math.sin(ry), y+h/2, z + backOffZ*Math.cos(ry), ry);
+  const armOffX = w/2 - 0.15;
+  box(0.3, h*0.8, d, seatMat, x + armOffX*Math.cos(ry), y+h*0.4, z + armOffX*Math.sin(ry), ry);
+  box(0.3, h*0.8, d, seatMat, x - armOffX*Math.cos(ry), y+h*0.4, z - armOffX*Math.sin(ry), ry);
+}
+
+function bedFrame(w,h,d,frameMat,beddingMat,x,y,z,ry=0){
+  box(w, h*0.3, d, frameMat, x, y+h*0.15, z, ry);
+  box(w, h*0.55, d*0.9, beddingMat, x, y+h*0.15+h*0.3, z, ry);
+  const headOffZ = -d/2 - 0.05;
+  box(w, h*1.6, 0.15, frameMat, x + headOffZ*Math.sin(ry), y+h*0.8, z + headOffZ*Math.cos(ry), ry);
+  box(w*0.3, h*0.25, d*0.2, mat(0xffffff), x - w*0.25, y+h*0.15+h*0.3+h*0.28, z - d*0.3, ry); // pillow
+}
+
+function shelfUnit(w,h,d,shelfCount,frameMat,x,y,z,ry=0){
+  box(0.1,h,d, frameMat, x-w/2, y+h/2, z, ry);
+  box(0.1,h,d, frameMat, x+w/2, y+h/2, z, ry);
+  for (let i=0;i<=shelfCount;i++){
+    box(w,0.06,d, frameMat, x, y + (h/shelfCount)*i, z, ry);
+  }
+}
+
+function windowFrame(cx, cy, cz, w, h, frameMat, ry=0){
+  const t = 0.1;
+  box(w, t, t, frameMat, cx, cy+h/2, cz, ry);
+  box(w, t, t, frameMat, cx, cy-h/2, cz, ry);
+  box(t, h, t, frameMat, cx - (w/2)*Math.cos(ry), cy, cz + (w/2)*Math.sin(ry), ry);
+  box(t, h, t, frameMat, cx + (w/2)*Math.cos(ry), cy, cz - (w/2)*Math.sin(ry), ry);
+  box(t, h, t, frameMat, cx, cy, cz, ry); // mullion
+  box(w, t, t, frameMat, cx, cy, cz, ry); // mullion
+  box(w-t, h-t, 0.04, M.glass, cx, cy, cz, ry);
+}
+
+function baseboard(cx, cz, length, thick, trimMat, rotated=false){
+  const w = rotated ? thick : length;
+  const d = rotated ? length : thick;
+  box(w, 0.18, d, trimMat, cx, 0.09, cz);
+}
+
+const trimMat = mat(0xf5f0e6);
+
 const WALL_H = 3.0;
 const T = 0.2; // wall thickness
 
@@ -273,20 +360,30 @@ floorPanel(0, 16, 6, 14, M.driveway, -0.05); // driveway leading to porch
 // ================= FRONT PORCH =================
 floorPanel(0, 8, 14, 6, M.porch, 0.05);
 roomLabel("Front Porch", -7, 7, 5, 11);
-[-6,-2,2,6].forEach(x => simpleProp(0.3,2.6,0.3, M.furniture, x, 0, 10.8));
-box(14.4, 0.3, 6.4, M.roof, 0, 2.7, 8);
-simpleProp(0.6,0.9,0.6, M.furniture, -3, 0.1, 9.5); // rocking chair
-simpleProp(0.6,0.9,0.6, M.furniture, -1.8, 0.1, 9.5); // rocking chair
+[-6,-2,2,6].forEach(x => {
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,2.6,10), M.furniture);
+  post.position.set(x, 1.3, 10.8); post.castShadow = true; group.add(post);
+});
+// pitched porch roof (two angled panels meeting at a ridge)
+const porchRoofL = box(14.6, 0.15, 3.6, M.roof, 0, 3.05, 9.4);
+porchRoofL.rotation.x = -0.28;
+const porchRoofR = box(14.6, 0.15, 3.6, M.roof, 0, 3.05, 6.6);
+porchRoofR.rotation.x = 0.28;
+tableWithLegs(0.7,0.85,0.7,0.05, M.furniture, M.furniture, -3, 0, 9.5);
+tableWithLegs(0.7,0.85,0.7,0.05, M.furniture, M.furniture, -1.8, 0, 9.5);
 lamp(0, 2.4, 8, 0xffcf8a, 0.6, 10);
 
 // ================= LIVING ROOM =================
 floorPanel(0, -3.5, 12, 7, M.floorWood, 0.05);
 roomLabel("Living Room", -6, 6, -7, 0);
-simpleProp(4,0.8,2, M.livingVelvet, 0, 0.1, -3, 0); // sunken sectional block
-simpleProp(1.2,0.5,1.2, M.furniture, 0, 0.1, -1.5); // coffee table
+sofaBlock(4, 0.8, 1.4, M.livingVelvet, 0, 0.05, -2.3);
+tableWithLegs(1.2,0.45,1.2,0.06, M.furniture, M.furniture, 0, 0.05, -0.8);
 box(3, 1.8, 0.3, M.accentBlack, -5.85, 0.9, -3); // fireplace surround
 box(2.2, 1.2, 0.15, mat(0x1a1a1a), -5.8, 0.6, -3); // firebox
-simpleProp(2.5, 1.8, 0.3, M.furniture, -5.85, 1.9, -4.5); // built-in bookshelf
+shelfUnit(2.2, 1.9, 0.3, 3, M.furniture, -5.85, 1.0, -4.8);
+windowFrame(3.5, 1.9, -6.85, 1.8, 1.6, trimMat);
+baseboard(0, -6.85, 12, 0.05, trimMat);
+baseboard(-5.85, -3.5, 7, 0.05, trimMat, true);
 lamp(-4, 2, -2, 0xffb066, 0.6, 6);
 
 doorway(0, 4.5, 12, WALL_H, T, M.wallOuter, false, 2.2);
@@ -296,9 +393,11 @@ floorPanel(0, -12, 12, 8, M.floorTile, 0.05);
 roomLabel("Kitchen & Dining", -6, 6, -16, -7);
 simpleProp(3.6,1.0,1.6, M.kitchenCabinet, 1.5, 0.1, -13); // island
 box(3.6, 0.1, 1.8, M.kitchenCounter, 1.5, 1.05, -13); // counter top
-simpleProp(2.6,0.9,1.2, M.diningWood, -2.5, 0.1, -14); // dining table
+tableWithLegs(2.4,0.75,1.1,0.06, M.diningWood, M.diningWood, -2.5, 0.05, -14);
 simpleProp(1.5,1.8,0.8, M.kitchenCabinet, 5.6, 0.1, -14); // double oven / pantry block
 box(1.1,1.1,0.1, M.metalChrome, 5.6, 1.0, -13.55); // oven door hint
+windowFrame(-4.5, 2.0, -15.85, 1.6, 1.4, trimMat);
+baseboard(0, -15.85, 12, 0.05, trimMat);
 lamp(1.5, 2.3, -13, 0xfff2d0, 0.7, 7);
 
 doorway(0, -7, 12, WALL_H, T, M.wallInner, false, 3);
@@ -320,14 +419,14 @@ lamp(-13, 2.3, -3, 0xfff2d0, 0.6, 7);
 // Boys room
 floorPanel(-13, -12, 8, 7, M.floorCarpetBlue, 0.05);
 roomLabel("Jakob's Room", -17, -9, -16, -9);
-simpleProp(2.4,1.2,1.6, M.boysRoomWood, -15.5, 0.1, -14); // loft bed block
+bedFrame(2, 0.7, 2.6, M.boysRoomWood, mat(0x33445a), -15.5, 0.05, -14);
 box(1.2, 2.2, 1.2, M.accentBlack, -10.5, 1.1, -12.5); // climbing wall hint
 lamp(-13, 2.3, -12, 0xa8c8ff, 0.5, 6);
 
 // Girls room
 floorPanel(-4.5, -12, 7, 7, M.floorCarpetPink, 0.05);
 roomLabel("Elli's Room", -8, -1, -16, -9);
-simpleProp(2,1.6,1.4, M.girlsRoomAccent, -6.5, 0.1, -14); // castle bed block
+bedFrame(1.8, 0.9, 2.4, M.girlsRoomAccent, mat(0xffffff), -6.5, 0.05, -14);
 lamp(-4.5, 2.3, -12, 0xffcfe6, 0.5, 6);
 
 doorway(-8, -3, 8, WALL_H, T, M.wallInner, true, 2);
@@ -340,16 +439,15 @@ wallSegment(-8.5, -16, 20, WALL_H, T, M.wallOuter, false);
 floorPanel(13, -3, 10, 8, M.floorCarpetPurple, 0.05);
 roomLabel("Office & Game Room", 8, 18, -7, 1);
 box(1.6, 1.2, 0.4, M.officeAccentPurple, 17.7, 0.6, -1); // arcade cabinet hint
-simpleProp(2.4,0.8,1, M.furniture, 11, 0.1, -1.5); // shared desk
-simpleProp(0.6,1.8,0.3, M.officeAccentBlack, 9, 0.9, -5.5); // NECA shelf hint
-box(0.55,0.55,0.55, M.accentPurple, 9, 1.5, -5.5); // figure on shelf hint
+tableWithLegs(2.4,0.75,1,0.06, M.officeAccentBlack, M.furniture, 11, 0.05, -1.5);
+shelfUnit(1.2, 1.8, 0.3, 3, M.officeAccentBlack, 9, 0.9, -5.5);
+box(0.4,0.4,0.4, M.accentPurple, 9, 1.4, -5.5); // figure on shelf hint
 lamp(13, 2.3, -3, 0xb99aff, 0.55, 7);
 
 // Master Suite
 floorPanel(13, -12, 10, 7, M.masterCarpet, 0.05);
 roomLabel("Master Bedroom", 8, 18, -16, -9);
-simpleProp(3,0.9,2.2, M.furniture, 11.5, 0.1, -12.5); // bed frame
-box(2.8, 0.35, 2, mat(0x2a2a30), 11.5, 0.95, -12.5); // dark bedding accent
+bedFrame(2.6, 0.8, 2.4, M.furniture, mat(0x2a2a30), 11.5, 0.05, -12.5);
 box(2.2, 2.4, 0.3, M.bathroomTile, 17.8, 1.2, -14.5); // ensuite hint wall
 box(2.2, 2.4, 0.3, M.closetWood, 17.8, 1.2, -10); // closet hint wall
 lamp(11.5, 2.3, -12.5, 0xffcf8a, 0.5, 6);
@@ -362,8 +460,15 @@ wallSegment(13.5, -16, 20, WALL_H, T, M.wallOuter, false);
 wallSegment(-9, 0, 6, WALL_H, T, M.wallOuter, false);
 wallSegment(9, 0, 6, WALL_H, T, M.wallOuter, false);
 
-// ================= ROOFING =================
-box(38, 0.3, 24, M.roof, 0, WALL_H + 0.15, -8);
+// ================= ROOFING (pitched gable, not a flat slab) =================
+const roofSpan = 40, roofDepth = 25, roofRise = 3.4, ridgeY = WALL_H + roofRise;
+const roofPanelLen = Math.sqrt(roofSpan*roofSpan/4 + roofRise*roofRise);
+const roofAngle = Math.atan2(roofRise, roofSpan/2);
+const roofL = box(roofPanelLen, 0.2, roofDepth, M.roof, -roofSpan/4, WALL_H + roofRise/2, -8);
+roofL.rotation.z = roofAngle;
+const roofR = box(roofPanelLen, 0.2, roofDepth, M.roof, roofSpan/4, WALL_H + roofRise/2, -8);
+roofR.rotation.z = -roofAngle;
+box(0.3, 0.3, roofDepth, mat(0x1a1a1a), 0, ridgeY, -8); // ridge cap
 
 // ================= BACKYARD =================
 roomLabel("Backyard", -20, 20, -36, -17);
